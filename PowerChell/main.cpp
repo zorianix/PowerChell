@@ -22,6 +22,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
     {
     case DLL_PROCESS_ATTACH:
         DisableThreadLibraryCalls(hModule);
+        g_hEvent = CreateEventW(NULL, TRUE, FALSE, NULL);
         CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)StartPowerShellInNewConsole, NULL, 0, NULL);
         break;
     case DLL_PROCESS_DETACH:
@@ -38,12 +39,10 @@ void APIENTRY Start()
 
 void StartPowerShellInNewConsole()
 {
-    if ((g_hEvent = CreateEventW(NULL, TRUE, FALSE, NULL)) != NULL)
-    {
-        AllocConsole();
-        StartPowerShell();
-        SetEvent(g_hEvent);
-        FreeConsole();
-    }
+    AllocConsole();
+    StartPowerShell();
+    SetEvent(g_hEvent);
+    CloseHandle(g_hEvent);
+    FreeConsole();
 }
 #endif
