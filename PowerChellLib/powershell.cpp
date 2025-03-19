@@ -18,7 +18,10 @@ void StartPowerShell()
         goto exit;
 
     if (!PatchAmsiOpenSession())
-        PRINT_ERROR("Failed to disable AMSI.\n");
+        PRINT_ERROR("Failed to disable AMSI (1).\n");
+
+    if (!PatchAmsiScanBuffer())
+        PRINT_ERROR("Failed to disable AMSI (2).\n");
 
     if (!DisablePowerShellEtwProvider(pAppDomain))
         PRINT_ERROR("Failed to disable ETW Provider.\n");

