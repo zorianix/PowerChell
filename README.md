@@ -8,7 +8,9 @@ A proof-of-concept aimed at creating **a PowerShell console in C/C++**, with all
 2. In the toolbar, select `RELEASE-EXE` if you want to build the executable (.exe) file, or `RELEASE-DLL` if you want to build the DLL. In both cases, the target configuration will be `x64` because this is the only supported platform.
 3. In the top bar, click `Build > Build Solution` to build the project.
 
-## Run
+## Usage
+
+### Open a PowerShell Console
 
 You should be able to run the **executable** straight away:
 
@@ -38,6 +40,35 @@ rundll32 PowerChell.dll,Start
 ```
 
 In the command above, `Start` is the name of a dummy function. It exists only to prevent `rundll32` from complaining about not finding the entry point. You can very well specify any entry point you want. It will work as long as you don't close the error dialog.
+
+### Execute a Command
+
+You can also execute a PowerShell command like this:
+
+```console
+C:\Users\Dummy\Downloads>PowerChell.exe -c "$PSVersionTable"
+
++-----------------------------------+
+| POWERSHELL STANDARD OUTPUT STREAM |
++-----------------------------------+
+
+Name                           Value
+----                           -----
+PSVersion                      5.1.26100.3624
+PSEdition                      Desktop
+PSCompatibleVersions           {1.0, 2.0, 3.0, 4.0...}
+BuildVersion                   10.0.26100.3624
+CLRVersion                     4.0.30319.42000
+WSManStackVersion              3.0
+PSRemotingProtocolVersion      2.3
+SerializationVersion           1.1.0.1
+```
+
+This also works with the **DLL**, albeit less convient because you won't see the result:
+
+```batch
+rundll32 PowerChell.dll,Start -c "$PSVersionTable"
+```
 
 ## Caveats
 

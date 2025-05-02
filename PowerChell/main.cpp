@@ -1,15 +1,18 @@
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
+#include <shellapi.h>
 #include "../PowerChellLib/powershell.h"
 
-#ifndef _WINDLL
-int main()
+typedef struct _POWERCHELL_OPTIONS
 {
-    StartPowerShell();
+    LPWSTR Script;
+} POWERCHELL_OPTIONS, *PPOWERCHELL_OPTIONS;
 
-    return 0;
-}
-#else
+void PowerChellMain();
+BOOL ParseCommandLine(PPOWERCHELL_OPTIONS pOptions);
+
+#ifdef _WINDLL
+
 extern "C" __declspec(dllexport) void APIENTRY Start();
 void StartPowerShellInNewConsole();
 
@@ -40,9 +43,61 @@ void APIENTRY Start()
 void StartPowerShellInNewConsole()
 {
     AllocConsole();
-    StartPowerShell();
+    PowerChellMain();
     SetEvent(g_hEvent);
     CloseHandle(g_hEvent);
     FreeConsole();
 }
-#endif
+
+#else
+
+int main()
+{
+    PowerChellMain();
+
+    return 0;
+}
+
+#endif // #ifdef _WINDLL
+
+void PowerChellMain()
+{
+    POWERCHELL_OPTIONS pOptions = { 0 };
+    
+    ParseCommandLine(&pOptions);
+
+    if (pOptions.Script != NULL)
+    {
+        ExecutePowerShellScript(pOptions.Script);
+    }
+    else
+    {
+        CreatePowerShellConsole();
+    }
+}
+
+BOOL ParseCommandLine(PPOWERCHELL_OPTIONS pOptions)
+{
+    int iArgc = 0;
+    LPWSTR* ppwszArgv = NULL;
+
+    ppwszArgv = CommandLineToArgvW(GetCommandLineW(), &iArgc);
+    if (ppwszArgv == NULL)
+    {
+        return FALSE;
+    }
+
+    for (int i = 0; i < iArgc; i++)
+    {
+        if (_wcsicmp(ppwszArgv[i], L"-c") == 0)
+        {
+            i += 1;
+            if (i < iArgc && ppwszArgv[i] != NULL)
+            {
+                pOptions->Script = ppwszArgv[i];
+            }
+        }
+    }
+
+    return TRUE;
+}

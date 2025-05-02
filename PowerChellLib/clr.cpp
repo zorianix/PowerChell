@@ -1,7 +1,7 @@
 #include "common.h"
 #include "clr.h"
 
-BOOL InitializeCommonLanguageRuntime(PCLR_CONTEXT pClrContext, mscorlib::_AppDomain** ppAppDomain)
+BOOL clr::InitializeCommonLanguageRuntime(PCLR_CONTEXT pClrContext, mscorlib::_AppDomain** ppAppDomain)
 {
     BOOL bResult = FALSE;
     HRESULT hr;
@@ -51,7 +51,7 @@ exit:
     return bResult;
 }
 
-void DestroyCommonLanguageRuntime(PCLR_CONTEXT pClrContext, mscorlib::_AppDomain* pAppDomain)
+void clr::DestroyCommonLanguageRuntime(PCLR_CONTEXT pClrContext, mscorlib::_AppDomain* pAppDomain)
 {
     if (pAppDomain) pAppDomain->Release();
     if (pClrContext->pAppDomainThunk) pClrContext->pAppDomainThunk->Release();
@@ -60,7 +60,7 @@ void DestroyCommonLanguageRuntime(PCLR_CONTEXT pClrContext, mscorlib::_AppDomain
     if (pClrContext->pMetaHost) pClrContext->pMetaHost->Release();
 }
 
-BOOL FindAssemblyPath(LPCWSTR pwszAssemblyName, LPWSTR* ppwszAssemblyPath)
+BOOL clr::FindAssemblyPath(LPCWSTR pwszAssemblyName, LPWSTR* ppwszAssemblyPath)
 {
     BOOL bResult = FALSE;
     WIN32_FIND_DATA ffd = { 0 };
@@ -108,7 +108,7 @@ exit:
     return bResult;
 }
 
-BOOL GetAssembly(mscorlib::_AppDomain* pAppDomain, LPCWSTR pwszAssemblyName, mscorlib::_Assembly** ppAssembly)
+BOOL clr::GetAssembly(mscorlib::_AppDomain* pAppDomain, LPCWSTR pwszAssemblyName, mscorlib::_Assembly** ppAssembly)
 {
     BOOL bResult = FALSE;
     HRESULT hr;
@@ -176,7 +176,7 @@ exit:
     return bResult;
 }
 
-BOOL LoadAssembly(mscorlib::_AppDomain* pAppDomain, LPCWSTR pwszAssemblyName, mscorlib::_Assembly** ppAssembly)
+BOOL clr::LoadAssembly(mscorlib::_AppDomain* pAppDomain, LPCWSTR pwszAssemblyName, mscorlib::_Assembly** ppAssembly)
 {
     BOOL bResult = FALSE;
     HRESULT hr;
@@ -189,9 +189,9 @@ BOOL LoadAssembly(mscorlib::_AppDomain* pAppDomain, LPCWSTR pwszAssemblyName, ms
     mscorlib::_Assembly* pAssembly = NULL;
 
     // Check if assembly is already loaded
-    if (!GetAssembly(pAppDomain, pwszAssemblyName, &pAssembly))
+    if (!clr::GetAssembly(pAppDomain, pwszAssemblyName, &pAssembly))
     {
-        if (!FindAssemblyPath(pwszAssemblyName, &pwszAssemblyPath))
+        if (!clr::FindAssemblyPath(pwszAssemblyName, &pwszAssemblyPath))
             goto exit;
 
         hAssemblyFile = CreateFileW(pwszAssemblyPath, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
@@ -218,7 +218,176 @@ exit:
     return bResult;
 }
 
-BOOL FindMethodInArray(SAFEARRAY* pMethods, LPCWSTR pwszMethodName, LONG lNbArgs, mscorlib::_MethodInfo** ppMethodInfo)
+BOOL clr::CreateInstance(mscorlib::_AppDomain* pAppDomain, LPCWSTR pwszAssemblyName, LPCWSTR pwszClassName, VARIANT* pvtInstance)
+{
+    BOOL bResult = FALSE;
+    HRESULT hr;
+    BSTR bstrClassName = SysAllocString(pwszClassName);
+    VARIANT vtInstance = { 0 };
+    mscorlib::_Assembly* pAssembly = NULL;
+
+    if (!clr::LoadAssembly(pAppDomain, pwszAssemblyName, &pAssembly))
+        goto exit;
+
+    hr = pAssembly->CreateInstance(bstrClassName, &vtInstance);
+    EXIT_ON_HRESULT_ERROR(L"Assembly->CreateInstance", hr);
+
+    memcpy_s(pvtInstance, sizeof(*pvtInstance), &vtInstance, sizeof(vtInstance));
+    bResult = TRUE;
+
+exit:
+    if (bstrClassName) SysFreeString(bstrClassName);
+    if (pAssembly) pAssembly->Release();
+
+    return bResult;
+}
+
+BOOL clr::GetType(mscorlib::_AppDomain* pAppDomain, LPCWSTR pwszAssemblyName, LPCWSTR pwszTypeFullName, mscorlib::_Type** ppType)
+{
+    HRESULT hr;
+    BOOL bResult = FALSE;
+    BSTR bstrTypeFullName = SysAllocString(pwszTypeFullName);
+    mscorlib::_Assembly* pAssembly = NULL;
+    mscorlib::_Type* pType = NULL;
+
+    if (!clr::LoadAssembly(pAppDomain, pwszAssemblyName, &pAssembly))
+        goto exit;
+
+    hr = pAssembly->GetType_2(bstrTypeFullName, &pType);
+    EXIT_ON_HRESULT_ERROR(L"Assembly->GetType_2", hr);
+    EXIT_ON_NULL_POINTER(pwszTypeFullName, pType);
+
+    *ppType = pType;
+    bResult = TRUE;
+
+exit:
+    if (bstrTypeFullName) SysFreeString(bstrTypeFullName);
+    if (pAssembly) pAssembly->Release();
+
+    return bResult;
+}
+
+BOOL clr::GetProperty(mscorlib::_Type* pType, mscorlib::BindingFlags bindingFlags, LPCWSTR pwszPropertyName, mscorlib::_PropertyInfo** ppPropertyInfo)
+{
+    HRESULT hr;
+    BOOL bResult = FALSE;
+    BSTR bstrPropertyName = SysAllocString(pwszPropertyName);
+    mscorlib::_PropertyInfo* pPropertyInfo = NULL;
+
+    hr = pType->GetProperty(bstrPropertyName, bindingFlags, &pPropertyInfo);
+    EXIT_ON_HRESULT_ERROR(L"Type->GetProperty", hr);
+    EXIT_ON_NULL_POINTER(pwszPropertyName, pPropertyInfo);
+
+    *ppPropertyInfo = pPropertyInfo;
+    bResult = TRUE;
+
+exit:
+    if (bstrPropertyName) SysFreeString(bstrPropertyName);
+
+    return bResult;
+}
+
+BOOL clr::GetPropertyValue(mscorlib::_Type* pType, mscorlib::BindingFlags bindingFlags, VARIANT vtObject, LPCWSTR pwszPropertyName, VARIANT* pvtPropertyValue)
+{
+    BOOL bResult = FALSE;
+    HRESULT hr;
+    VARIANT vtPropertyValue = { 0 };
+    mscorlib::_PropertyInfo* pPropertyInfo = NULL;
+
+    if (!clr::GetProperty(pType, bindingFlags, pwszPropertyName, &pPropertyInfo))
+        goto exit;
+
+    hr = pPropertyInfo->GetValue(vtObject, NULL, &vtPropertyValue);
+    EXIT_ON_HRESULT_ERROR(L"PropertyInfo->GetValue", hr);
+
+    memcpy_s(pvtPropertyValue, sizeof(*pvtPropertyValue), &vtPropertyValue, sizeof(vtPropertyValue));
+    bResult = TRUE;
+
+exit:
+    if (pPropertyInfo) pPropertyInfo->Release();
+
+    return bResult;
+}
+
+BOOL clr::GetField(mscorlib::_Type* pType, mscorlib::BindingFlags bindingFlags, LPCWSTR pwszFieldName, mscorlib::_FieldInfo** ppFieldInfo)
+{
+    HRESULT hr;
+    BOOL bResult = FALSE;
+    BSTR bstrFieldName = SysAllocString(pwszFieldName);
+    mscorlib::_FieldInfo* pFieldInfo = NULL;
+
+    hr = pType->GetField(bstrFieldName, bindingFlags, &pFieldInfo);
+    EXIT_ON_HRESULT_ERROR(L"Type->GetField", hr);
+    EXIT_ON_NULL_POINTER(pwszFieldName, pFieldInfo);
+
+    *ppFieldInfo = pFieldInfo;
+    bResult = TRUE;
+
+exit:
+    if (bstrFieldName) SysFreeString(bstrFieldName);
+
+    return bResult;
+}
+
+BOOL clr::GetFieldValue(mscorlib::_Type* pType, mscorlib::BindingFlags bindingFlags, VARIANT vtObject, LPCWSTR pwszFieldName, VARIANT* pvtFieldValue)
+{
+    BOOL bResult = FALSE;
+    HRESULT hr;
+    VARIANT vtValue = { 0 };
+    mscorlib::_FieldInfo* pFieldInfo = NULL;
+
+    if (!clr::GetField(pType, bindingFlags, pwszFieldName, &pFieldInfo))
+        goto exit;
+
+    hr = pFieldInfo->GetValue(vtObject, &vtValue);
+    EXIT_ON_HRESULT_ERROR(L"FieldInfo->GetValue", hr);
+
+    memcpy_s(pvtFieldValue, sizeof(*pvtFieldValue), &vtValue, sizeof(vtValue));
+    bResult = TRUE;
+
+exit:
+    if (pFieldInfo) pFieldInfo->Release();
+
+    return bResult;
+}
+
+BOOL clr::GetMethod(mscorlib::_Type* pType, mscorlib::BindingFlags bindingFlags, LPCWSTR pwszMethodName, LONG lNbArg, mscorlib::_MethodInfo** ppMethodInfo)
+{
+    HRESULT hr;
+    BOOL bResult = FALSE;
+    SAFEARRAY* pMethods = NULL;
+    mscorlib::_MethodInfo* pMethodInfo;
+
+    hr = pType->GetMethods(bindingFlags, &pMethods);
+    EXIT_ON_HRESULT_ERROR(L"Type->GetMethods", hr);
+
+    if (!clr::FindMethodInArray(pMethods, pwszMethodName, lNbArg, &pMethodInfo))
+        goto exit;
+
+    *ppMethodInfo = pMethodInfo;
+    bResult = TRUE;
+
+exit:
+    if (pMethods) SafeArrayDestroy(pMethods);
+
+    return bResult;
+}
+
+BOOL clr::InvokeMethod(mscorlib::_MethodInfo* pMethodInfo, VARIANT vtObject, SAFEARRAY* pParameters, VARIANT* pvtResult)
+{
+    HRESULT hr;
+    BOOL bResult = FALSE;
+    
+    hr = pMethodInfo->Invoke_3(vtObject, pParameters, pvtResult);
+    EXIT_ON_HRESULT_ERROR(L"MethodInfo->Invoke_3", hr);
+
+    bResult = TRUE;
+
+exit:
+    return bResult;
+}
+
+BOOL clr::FindMethodInArray(SAFEARRAY* pMethods, LPCWSTR pwszMethodName, LONG lNbArgs, mscorlib::_MethodInfo** ppMethodInfo)
 {
     BOOL bResult = FALSE;
     HRESULT hr;
@@ -256,6 +425,8 @@ BOOL FindMethodInArray(SAFEARRAY* pMethods, LPCWSTR pwszMethodName, LONG lNbArgs
                         pTargetMethodInfo = ppMethods[i];
                         break;
                     }
+
+                    SafeArrayDestroy(pParameters);
                 }
             }
 
@@ -273,135 +444,80 @@ BOOL FindMethodInArray(SAFEARRAY* pMethods, LPCWSTR pwszMethodName, LONG lNbArgs
     *ppMethodInfo = pTargetMethodInfo;
 
 exit:
-    if (pParameters) SafeArrayDestroy(pParameters);
-
     return bResult;
 }
 
-BOOL PrepareMethod(mscorlib::_AppDomain* pAppDomain, VARIANT* pvtMethodHandle)
+BOOL clr::PrepareMethod(mscorlib::_AppDomain* pAppDomain, VARIANT* pvtMethodHandle)
 {
     BOOL bResult = FALSE;
-    HRESULT hr;
     LONG lArgumentIndex;
-    BSTR bstrRuntimeHelpersFullName = SysAllocString(L"System.Runtime.CompilerServices.RuntimeHelpers");
-    SAFEARRAY* pRuntimeHelpersMethods = NULL;
     SAFEARRAY* pPrepareMethodArguments = NULL;
     VARIANT vtEmpty = { 0 };
     VARIANT vtResult = { 0 };
-    mscorlib::_Assembly* pRuntimeAssembly = NULL;
     mscorlib::_Type* pRuntimeHelpersType = NULL;
     mscorlib::_MethodInfo* pPrepareMethod = NULL;
 
-    if (!LoadAssembly(pAppDomain, ASSEMBLY_NAME_SYSTEM_RUNTIME, &pRuntimeAssembly))
+    if (!clr::GetType(pAppDomain, ASSEMBLY_NAME_SYSTEM_RUNTIME, L"System.Runtime.CompilerServices.RuntimeHelpers", &pRuntimeHelpersType))
         goto exit;
 
-    hr = pRuntimeAssembly->GetType_2(bstrRuntimeHelpersFullName, &pRuntimeHelpersType);
-
-    EXIT_ON_HRESULT_ERROR(L"(System.Runtime.CompilerServices.RuntimeHelpers) Assembly->GetType_2", hr);
-    EXIT_ON_NULL_POINTER(L"System.Runtime.CompilerServices.RuntimeHelpers type", pRuntimeHelpersType);
-
-    hr = pRuntimeHelpersType->GetMethods(
-        static_cast<mscorlib::BindingFlags>(mscorlib::BindingFlags::BindingFlags_Static | mscorlib::BindingFlags::BindingFlags_Public),
-        &pRuntimeHelpersMethods
-    );
-
-    EXIT_ON_HRESULT_ERROR(L"(System.Runtime.CompilerServices.RuntimeHelpers) Type->GetMethods", hr);
-
-    FindMethodInArray(pRuntimeHelpersMethods, L"PrepareMethod", 1, &pPrepareMethod);
-
-    if (!pPrepareMethod)
-    {
-        PRINT_ERROR("Method RuntimeHelpers.PrepareMethod(RuntimeMethodHandle) not found.\n");
+    if (!clr::GetMethod(pRuntimeHelpersType, static_cast<mscorlib::BindingFlags>(BINDING_FLAGS_PUBLIC_STATIC), L"PrepareMethod", 1, &pPrepareMethod))
         goto exit;
-    }
 
     pPrepareMethodArguments = SafeArrayCreateVector(VT_VARIANT, 0, 1);
 
     lArgumentIndex = 0;
-    hr = SafeArrayPutElement(pPrepareMethodArguments, &lArgumentIndex, pvtMethodHandle);
-    
-    // The first parameter is supposed to be an object instance, but here we invoke
-    // a static method, so it doesn't matter, and can just be "empty".
-    hr = pPrepareMethod->Invoke_3(vtEmpty, pPrepareMethodArguments, &vtResult);
-    EXIT_ON_HRESULT_ERROR(L"(RuntimeHelpers.GetFunctionPointer) MethodInfo->Invoke_3", hr);
+    SafeArrayPutElement(pPrepareMethodArguments, &lArgumentIndex, pvtMethodHandle);
+
+    if (!clr::InvokeMethod(pPrepareMethod, vtEmpty, pPrepareMethodArguments, &vtResult))
+        goto exit;
 
     bResult = TRUE;
 
 exit:
-    if (bstrRuntimeHelpersFullName) SysFreeString(bstrRuntimeHelpersFullName);
-
-    if (pRuntimeHelpersMethods) SafeArrayDestroy(pRuntimeHelpersMethods);
     if (pPrepareMethodArguments) SafeArrayDestroy(pPrepareMethodArguments);
 
     if (pPrepareMethod) pPrepareMethod->Release();
     if (pRuntimeHelpersType) pRuntimeHelpersType->Release();
-    if (pRuntimeAssembly) pRuntimeAssembly->Release();
+
+    VariantClear(&vtResult);
 
     return bResult;
 }
 
-BOOL GetFunctionPointer(mscorlib::_AppDomain* pAppDomain, VARIANT* pvtMethodHandle, PULONG_PTR pFunctionPointer)
+BOOL clr::GetFunctionPointer(mscorlib::_AppDomain* pAppDomain, VARIANT* pvtMethodHandle, PULONG_PTR pFunctionPointer)
 {
     BOOL bResult = FALSE;
-    HRESULT hr;
-    BSTR bstrRuntimeMethodHandleFullName = SysAllocString(L"System.RuntimeMethodHandle");
-    SAFEARRAY* pRuntimeMethodHandleMethods = NULL;
     VARIANT vtFunctionPointer = { 0 };
-    mscorlib::_Assembly* pRuntimeAssembly = NULL;
     mscorlib::_Type* pRuntimeMethodHandleType = NULL;
     mscorlib::_MethodInfo* pGetFunctionPointerInfo = NULL;
 
-    if (!LoadAssembly(pAppDomain, L"System.Runtime", &pRuntimeAssembly))
+    if (!clr::GetType(pAppDomain, ASSEMBLY_NAME_SYSTEM_RUNTIME, L"System.RuntimeMethodHandle", &pRuntimeMethodHandleType))
         goto exit;
 
-    hr = pRuntimeAssembly->GetType_2(bstrRuntimeMethodHandleFullName, &pRuntimeMethodHandleType);
-    EXIT_ON_HRESULT_ERROR(L"Assembly->GetType_2", hr);
-    EXIT_ON_NULL_POINTER(L"RuntimeMethodHandle type", pRuntimeMethodHandleType);
-
-    hr = pRuntimeMethodHandleType->GetMethods(
-        static_cast<mscorlib::BindingFlags>(mscorlib::BindingFlags::BindingFlags_Public | mscorlib::BindingFlags::BindingFlags_Instance),
-        &pRuntimeMethodHandleMethods
-    );
-
-    EXIT_ON_HRESULT_ERROR(L"Type->GetMethods", hr);
-
-    if (!FindMethodInArray(pRuntimeMethodHandleMethods, L"GetFunctionPointer", 0, &pGetFunctionPointerInfo))
+    if (!clr::GetMethod(pRuntimeMethodHandleType, static_cast<mscorlib::BindingFlags>(BINDING_FLAGS_PUBLIC_INSTANCE), L"GetFunctionPointer", 0, &pGetFunctionPointerInfo))
         goto exit;
 
-    hr = pGetFunctionPointerInfo->Invoke_3(*pvtMethodHandle, NULL, &vtFunctionPointer);
-    EXIT_ON_HRESULT_ERROR(L"MethodInfo->Invoke_3", hr);
+    if (!clr::InvokeMethod(pGetFunctionPointerInfo, *pvtMethodHandle, NULL, &vtFunctionPointer))
+        goto exit;
 
     *pFunctionPointer = vtFunctionPointer.ullVal;
     bResult = TRUE;
 
 exit:
-    if (bstrRuntimeMethodHandleFullName) SysFreeString(bstrRuntimeMethodHandleFullName);
-
-    if (pRuntimeMethodHandleMethods) SafeArrayDestroy(pRuntimeMethodHandleMethods);
-
     if (pGetFunctionPointerInfo) pGetFunctionPointerInfo->Release();
     if (pRuntimeMethodHandleType) pRuntimeMethodHandleType->Release();
-    if (pRuntimeAssembly) pRuntimeAssembly->Release();
 
     return bResult;
 }
 
-BOOL GetJustInTimeMethodAddress(mscorlib::_AppDomain* pAppDomain, LPCWSTR pwszAssemblyName, LPCWSTR pwszClassName, LPCWSTR pwszMethodName, DWORD dwNbArgs, PULONG_PTR pMethodAddress)
+BOOL clr::GetJustInTimeMethodAddress(mscorlib::_AppDomain* pAppDomain, LPCWSTR pwszAssemblyName, LPCWSTR pwszClassName, LPCWSTR pwszMethodName, DWORD dwNbArgs, PULONG_PTR pMethodAddress)
 {
     BOOL bResult = FALSE;
-    HRESULT hr;
-    BSTR bstrClassName = SysAllocString(pwszClassName);
-    BSTR bstrMethodInfoFullName = SysAllocString(L"System.Reflection.MethodInfo");
-    BSTR bstrMethodHandlePropName = SysAllocString(L"MethodHandle");
-    SAFEARRAY* pMethods = NULL;
     VARIANT vtMethodHandlePtr = { 0 };
     VARIANT vtMethodHandleVal = { 0 };
-    mscorlib::_Assembly* pAssembly = NULL;
-    mscorlib::_Assembly* pReflectionAssembly = NULL;
     mscorlib::_Type* pType = NULL;
     mscorlib::_Type* pMethodInfoType = NULL;
     mscorlib::_MethodInfo* pTargetMethodInfo = NULL;
-    mscorlib::_PropertyInfo* pMethodHandlePropInfo = NULL;
 
     // Here, we include as many binding flags as we can so that we can list
     // ALL the methods of the target class.
@@ -413,27 +529,11 @@ BOOL GetJustInTimeMethodAddress(mscorlib::_AppDomain* pAppDomain, LPCWSTR pwszAs
         mscorlib::BindingFlags::BindingFlags_DeclaredOnly
     );
 
-    if (!LoadAssembly(pAppDomain, pwszAssemblyName, &pAssembly))
+    if (!clr::GetType(pAppDomain, pwszAssemblyName, pwszClassName, &pType))
         goto exit;
 
-    if (!LoadAssembly(pAppDomain, L"System.Reflection", &pReflectionAssembly))
+    if (!clr::GetMethod(pType, flags, pwszMethodName, dwNbArgs, &pTargetMethodInfo))
         goto exit;
-
-    hr = pAssembly->GetType_2(bstrClassName, &pType);
-    EXIT_ON_HRESULT_ERROR(L"Assembly->GetType_2", hr);
-    EXIT_ON_NULL_POINTER(L"Input type", pType);
-
-    hr = pType->GetMethods(flags, &pMethods);
-    EXIT_ON_HRESULT_ERROR(L"Type->GetMethods", hr);
-
-    if (!FindMethodInArray(pMethods, pwszMethodName, dwNbArgs, &pTargetMethodInfo))
-        goto exit;
-
-    if (!pTargetMethodInfo)
-    {
-        PRINT_ERROR("Method '%ws.%ws' not found.\n", pwszClassName, pwszMethodName);
-        goto exit;
-    }
 
     //
     // The method for obtaining the MethodHandle from the MethodInfo object is
@@ -443,24 +543,14 @@ BOOL GetJustInTimeMethodAddress(mscorlib::_AppDomain* pAppDomain, LPCWSTR pwszAs
     //   - https://www.outflank.nl/blog/2024/02/01/unmanaged-dotnet-patching/
     //
 
-    hr = pReflectionAssembly->GetType_2(bstrMethodInfoFullName, &pMethodInfoType);
-    EXIT_ON_HRESULT_ERROR(L"Assembly->GetType_2", hr);
-    EXIT_ON_NULL_POINTER(L"MethodInfo type", pMethodInfoType);
-
-    hr = pMethodInfoType->GetProperty(
-        bstrMethodHandlePropName,
-        static_cast<mscorlib::BindingFlags>(mscorlib::BindingFlags::BindingFlags_Instance | mscorlib::BindingFlags::BindingFlags_Public),
-        &pMethodHandlePropInfo
-    );
-
-    EXIT_ON_HRESULT_ERROR(L"Type->GetProperty", hr);
-    EXIT_ON_NULL_POINTER(L"MethodHandle property type", pMethodHandlePropInfo);
+    if (!clr::GetType(pAppDomain, ASSEMBLY_NAME_SYSTEM_REFLECTION, L"System.Reflection.MethodInfo", &pMethodInfoType))
+        goto exit;
 
     vtMethodHandlePtr.vt = VT_UNKNOWN;
     vtMethodHandlePtr.punkVal = pTargetMethodInfo;
 
-    hr = pMethodHandlePropInfo->GetValue(vtMethodHandlePtr, NULL, &vtMethodHandleVal);
-    EXIT_ON_HRESULT_ERROR(L"MethodHandle->GetValue", hr);
+    if (!clr::GetPropertyValue(pMethodInfoType, static_cast<mscorlib::BindingFlags>(BINDING_FLAGS_PUBLIC_INSTANCE), vtMethodHandlePtr, L"MethodHandle", &vtMethodHandleVal))
+        goto exit;
 
     //
     // Next, we can invoke 'RuntimeHelpers.PrepareMethod' to make sure the target
@@ -480,20 +570,130 @@ BOOL GetJustInTimeMethodAddress(mscorlib::_AppDomain* pAppDomain, LPCWSTR pwszAs
     bResult = TRUE;
 
 exit:
-    if (bstrClassName) SysFreeString(bstrClassName);
-    if (bstrMethodInfoFullName) SysFreeString(bstrMethodInfoFullName);
-    if (bstrMethodHandlePropName) SysFreeString(bstrMethodHandlePropName);
-
-    if (pMethods) SafeArrayDestroy(pMethods);
-
     if (pTargetMethodInfo) pTargetMethodInfo->Release();
     if (pType) pType->Release();
-    if (pMethodHandlePropInfo) pMethodHandlePropInfo->Release();
     if (pMethodInfoType) pMethodInfoType->Release();
-    if (pReflectionAssembly) pReflectionAssembly->Release();
-    if (pAssembly) pAssembly->Release();
 
     VariantClear(&vtMethodHandleVal);
+    VariantClear(&vtMethodHandlePtr);
 
     return bResult;
+}
+
+BOOL dotnet::System_Object_GetType(mscorlib::_AppDomain* pAppDomain, VARIANT vtObject, VARIANT* pvtObjectType)
+{
+    BOOL bResult = FALSE;
+    VARIANT vtGetTypeResult = { 0 };
+    mscorlib::_Type* pObjectType = NULL;
+    mscorlib::_MethodInfo* pGetTypeMethodInfo = NULL;
+
+    if (!clr::GetType(pAppDomain, ASSEMBLY_NAME_SYSTEM_RUNTIME, L"System.Object", &pObjectType))
+        goto exit;
+
+    if (!clr::GetMethod(pObjectType, static_cast<mscorlib::BindingFlags>(BINDING_FLAGS_PUBLIC_INSTANCE), L"GetType", 0, &pGetTypeMethodInfo))
+        goto exit;
+
+    if (!clr::InvokeMethod(pGetTypeMethodInfo, vtObject, NULL, &vtGetTypeResult))
+        goto exit;
+
+    memcpy_s(pvtObjectType, sizeof(*pvtObjectType), &vtGetTypeResult, sizeof(vtGetTypeResult));
+    bResult = TRUE;
+
+exit:
+    if (pGetTypeMethodInfo) pGetTypeMethodInfo->Release();
+    if (pObjectType) pObjectType->Release();
+
+    return bResult;
+}
+
+BOOL dotnet::System_Type_GetProperty(mscorlib::_AppDomain* pAppDomain, VARIANT vtTypeObject, LPCWSTR pwszPropertyName, VARIANT* pvtPropertyInfo)
+{
+    BOOL bResult = FALSE;
+    LONG lArgumentIndex;
+    VARIANT vtPropertyName = { 0 };
+    VARIANT vtPropertyInfo = { 0 };
+    SAFEARRAY* pGetPropertyArguments = NULL;
+    mscorlib::_Type* pTypeType = NULL;
+    mscorlib::_MethodInfo* pGetPropertyMethodInfo = NULL;
+
+    if (!clr::GetType(pAppDomain, ASSEMBLY_NAME_SYSTEM_RUNTIME, L"System.Type", &pTypeType))
+        goto exit;
+
+    if (!clr::GetMethod(pTypeType, static_cast<mscorlib::BindingFlags>(BINDING_FLAGS_PUBLIC_INSTANCE), L"GetProperty", 1, &pGetPropertyMethodInfo))
+        goto exit;
+
+    InitVariantFromString(pwszPropertyName, &vtPropertyName);
+    pGetPropertyArguments = SafeArrayCreateVector(VT_VARIANT, 0, 1);
+
+    lArgumentIndex = 0;
+    SafeArrayPutElement(pGetPropertyArguments, &lArgumentIndex, &vtPropertyName);
+
+    if (!clr::InvokeMethod(pGetPropertyMethodInfo, vtTypeObject, pGetPropertyArguments, &vtPropertyInfo))
+        goto exit;
+
+    memcpy_s(pvtPropertyInfo, sizeof(*pvtPropertyInfo), &vtPropertyInfo, sizeof(vtPropertyInfo));
+    bResult = TRUE;
+
+exit:
+    if (pGetPropertyArguments) SafeArrayDestroy(pGetPropertyArguments);
+
+    if (pGetPropertyMethodInfo) pGetPropertyMethodInfo->Release();
+    if (pTypeType) pTypeType->Release();
+
+    VariantClear(&vtPropertyName);
+
+    return bResult;
+}
+
+BOOL dotnet::System_Reflection_PropertyInfo_GetValue(mscorlib::_AppDomain* pAppDomain, VARIANT vtPropertyInfo, VARIANT vtObject, SAFEARRAY* pIndex, VARIANT* pvtValue)
+{
+    BOOL bResult = FALSE;
+    LONG lNbArguments;
+    LONG lArgumentIndex;
+    VARIANT vtIndexArray = { 0 };
+    VARIANT vtValue = { 0 };
+    SAFEARRAY* pGetValueArguments = NULL;
+    mscorlib::_Type* pPropertyInfoType = NULL;
+    mscorlib::_MethodInfo* pGetValueMethodInfo = NULL;
+
+    lNbArguments = pIndex != NULL ? 2 : 1;
+
+    if (!clr::GetType(pAppDomain, ASSEMBLY_NAME_SYSTEM_REFLECTION, L"System.Reflection.PropertyInfo", &pPropertyInfoType))
+        goto exit;
+
+    if (!clr::GetMethod(pPropertyInfoType, static_cast<mscorlib::BindingFlags>(BINDING_FLAGS_PUBLIC_INSTANCE), L"GetValue", lNbArguments, &pGetValueMethodInfo))
+        goto exit;
+
+    pGetValueArguments = SafeArrayCreateVector(VT_VARIANT, 0, lNbArguments);
+    
+    lArgumentIndex = 0;
+    SafeArrayPutElement(pGetValueArguments, &lArgumentIndex, &vtObject);
+
+    if (pIndex != NULL)
+    {
+        vtIndexArray.vt = VT_ARRAY | VT_VARIANT;
+        vtIndexArray.parray = pIndex;
+
+        lArgumentIndex = 1;
+        SafeArrayPutElement(pGetValueArguments, &lArgumentIndex, &vtIndexArray);
+    }
+
+    if (!clr::InvokeMethod(pGetValueMethodInfo, vtPropertyInfo, pGetValueArguments, &vtValue))
+        goto exit;
+
+    memcpy_s(pvtValue, sizeof(*pvtValue), &vtValue, sizeof(vtValue));
+    bResult = TRUE;
+
+exit:
+    if (pGetValueArguments) SafeArrayDestroy(pGetValueArguments);
+
+    if (pGetValueMethodInfo) pGetValueMethodInfo->Release();
+    if (pPropertyInfoType) pPropertyInfoType->Release();
+
+    return bResult;
+}
+
+BOOL dotnet::System_Reflection_PropertyInfo_GetValue(mscorlib::_AppDomain* pAppDomain, VARIANT vtPropertyInfo, VARIANT vtObject, VARIANT* pvtValue)
+{
+    return dotnet::System_Reflection_PropertyInfo_GetValue(pAppDomain, vtPropertyInfo, vtObject, NULL, pvtValue);
 }

@@ -5,6 +5,8 @@
 
 #define DEBUG TRUE
 
+#define PRINT_INFO(f, ...) wprintf(L"[*] " ## f, __VA_ARGS__);
+#define PRINT_WARNING(f, ...) wprintf(L"[!] " ## f, __VA_ARGS__);
 #define PRINT_ERROR(f, ...) wprintf(L"[-] " ## f, __VA_ARGS__);
 #define EXIT_ON_NULL_POINTER(m, p) if (p == NULL) { PRINT_ERROR("Null pointer: %ws\n", m); goto exit; }
 

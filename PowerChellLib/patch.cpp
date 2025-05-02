@@ -222,7 +222,7 @@ BOOL PatchManagedFunction(mscorlib::_AppDomain* pAppDomain, LPCWSTR pwszAssembly
 {
     ULONG_PTR pMethodAddress = 0;
 
-    if (!GetJustInTimeMethodAddress(pAppDomain, pwszAssemblyName, pwszClassName, pwszMethodName, dwNbArgs, &pMethodAddress))
+    if (!clr::GetJustInTimeMethodAddress(pAppDomain, pwszAssemblyName, pwszClassName, pwszMethodName, dwNbArgs, &pMethodAddress))
         return FALSE;
 
     pMethodAddress += dwPatchOffset;
