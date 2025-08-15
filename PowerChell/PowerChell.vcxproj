@@ -13,6 +13,9 @@
   <ItemGroup>
     <ClCompile Include="main.cpp" />
   </ItemGroup>
+<ItemGroup>
+  <ResourceCompile Include="..\Resources\resources.rc" />
+</ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\PowerChellLib\PowerChellLib.vcxproj">
       <Project>{5fca91cb-7b0f-47b1-b030-11f1de990346}</Project>
