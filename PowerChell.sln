@@ -8,11 +8,11 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "PowerChellLib", "PowerChellLib\PowerChellLib.vcxproj", "{5FCA91CB-7B0F-47B1-B030-11F1DE990346}"
 EndProject
 Global
-	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+	GlobalSection(SolutionConfigurationPlatforms) = Release-EXE|x64
 		Release-DLL|x64 = Release-DLL|x64
 		Release-EXE|x64 = Release-EXE|x64
 	EndGlobalSection
-	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+	GlobalSection(ProjectConfigurationPlatforms) = Release-EXE|x64
 		{08469D96-635F-45F6-A810-2B5DDC637484}.Release-DLL|x64.ActiveCfg = Release-DLL|x64
 		{08469D96-635F-45F6-A810-2B5DDC637484}.Release-DLL|x64.Build.0 = Release-DLL|x64
 		{08469D96-635F-45F6-A810-2B5DDC637484}.Release-EXE|x64.ActiveCfg = Release-EXE|x64
@@ -22,10 +22,10 @@ Global
 		{5FCA91CB-7B0F-47B1-B030-11F1DE990346}.Release-EXE|x64.ActiveCfg = Release-EXE|x64
 		{5FCA91CB-7B0F-47B1-B030-11F1DE990346}.Release-EXE|x64.Build.0 = Release-EXE|x64
 	EndGlobalSection
-	GlobalSection(SolutionProperties) = preSolution
+	GlobalSection(SolutionProperties) = x64
 		HideSolutionNode = FALSE
 	EndGlobalSection
-	GlobalSection(ExtensibilityGlobals) = postSolution
+	GlobalSection(ExtensibilityGlobals) = Release-EXE|x64
 		SolutionGuid = {6E77EF1B-7CD9-449A-B82A-E95350D5E999}
 	EndGlobalSection
 EndGlobal
