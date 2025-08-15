@@ -18,17 +18,18 @@ jobs:
 
       - name: Build Release-DLL
         run: msbuild PowerChell.sln /m /p:Configuration="Release-DLL" /p:Platform="x64"
-
+        
+      - name: List build output
+        run: dir x64\Release
+        
       - name: Upload EXE artifact
         uses: actions/upload-artifact@v4
         with:
           name: PowerChell-Release-EXE
-          path: |
-            PowerChell\x64\Release\*.exe
+          path: x64/Release/*.exe
 
       - name: Upload DLL artifact
         uses: actions/upload-artifact@v4
         with:
           name: PowerChell-Release-DLL
-          path: |
-            PowerChellLib\x64\Release\*.dll
+          path: x64/Release/*.dll
